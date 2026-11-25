@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Algorithm Explorer: Smart Packing (0/1 Knapsack)</title>
+<style>
+:root{--bg:#f7f7f4;--card:#fff;--tx:#1d1d1b;--mut:#6a6a64;--ac:#1d6fb8;--bd:#dcdcd4;--err:#b3261e;--ok:#1b7a3d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17181a;--card:#222426;--tx:#ececE8;--mut:#a0a09a;--ac:#6db3f2;--bd:#383a3d;--err:#f2928b;--ok:#6fd392}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:860px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.7rem;margin:.2em 0}h2{font-size:1.15rem;margin:0 0 .5em}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px;margin:16px 0}
+.mut{color:var(--mut)}
+label{display:block;font-weight:600;margin:10px 0 4px}
+input,textarea{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:130px;font-family:ui-monospace,Menlo,monospace;font-size:.9rem}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);padding:8px 14px}
+button.go{background:var(--ac);color:#fff;border-color:var(--ac);margin-top:12px;font-weight:600}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tabs button[aria-selected="true"]{background:var(--ac);color:#fff;border-color:var(--ac)}
+#err{color:var(--err);font-weight:600;margin-top:10px;white-space:pre-line}
+.cx{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.cx span{border:1px solid var(--bd);border-radius:8px;padding:4px 10px;font-size:.9rem}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+td,th{border-bottom:1px solid var(--bd);padding:6px 8px;text-align:left}
+.best{color:var(--ok);font-weight:700}
+ol{padding-left:20px}
+</style>
+</head>
+<body>
+<main>
+<h1>📦 Algorithm Explorer: Smart Packing</h1>
+<p class="mut">One problem, four algorithms.</p>
+
+<section class="card" id="intro">
+<h2>The problem: 0/1 Knapsack</h2>
+<p>You have a container with a limited weight capacity and a list of items, each with a weight and a value. Every item can be taken once or left behind. Which items should you pack to get the highest total value without going over the limit?</p>
+<p><b>Why it matters:</b> The same pattern appears when loading a delivery truck, choosing which projects fit a budget, cutting stock material, or picking ads for limited airtime. Exact answers save money, while fast approximate answers keep large systems responsive.</p>
+<p><b>What the program computes:</b> the set of items with the maximum total value whose total weight is at most the capacity, solved with Brute Force, Greedy, Dynamic Programming and Backtracking (branch and bound), so you can compare their answers and costs.</p>
+</section>
+
+<section class="card">
+<h2>Your input</h2>
+<label for="cap">Capacity (whole number, 1 to 10000)</label>
+<input id="cap" type="number" value="50">
+<label for="items">Items, one per line: name, weight, value</label>
+<textarea id="items">Laptop, 10, 60
+Camera, 20, 100
+Water, 30, 120
+Books, 15, 45
+Jacket, 5, 25
+Snacks, 8, 30</textarea>
+<div class="mut" style="font-size:.85rem">Weights must be positive whole numbers, values must be non-negative numbers. Up to 25 items (brute force is limited to 20).</div>
+<button class="go" id="run">Solve with all four algorithms</button>
+<div id="err" role="alert"></div>
+</section>
+
+<section class="card" id="out" hidden>
+<h2>Algorithms</h2>
+<div class="tabs" role="tablist" id="tabs"></div>
+<div id="panel"></div>
+</section>
+
+<section class="card" id="cmp" hidden>
+<h2>Side-by-side comparison</h2>
+<div class="tablewrap"><table id="cmpT"></table></div>
+</section>
+</main>
+
+<script>
+var INFO = {
+brute:{name:"Brute Force",time:"O(2ⁿ · n)",space:"O(n)",
+steps:["Every item is either taken or left, so there are 2ⁿ possible subsets. Each subset is represented by a number from 0 to 2ⁿ−1 whose binary digits say which items are taken.","For each subset, add up the weights of the chosen items (n additions).","If the total weight is above the capacity, throw the subset away.","Otherwise compare its total value with the best seen so far and keep the larger one.","After all subsets are checked, the best one is guaranteed to be optimal. It is simple and always correct, but it becomes impossibly slow as n grows."]},
+greedy:{name:"Greedy",time:"O(n log n)",space:"O(n)",
+steps:["Compute the value-to-weight ratio of each item.","Sort items from the highest ratio to the lowest (this sort costs O(n log n)).","Walk through the sorted list once. If an item still fits in the remaining capacity, take it. Otherwise skip it.","Stop at the end of the list.","It is very fast, but it never reconsiders a choice, so it can miss the true optimum. It is only an approximation for 0/1 knapsack."]},
+dp:{name:"Dynamic Programming",time:"O(n · W)",space:"O(n · W)",
+steps:["Build a table where cell [i][w] is the best value achievable using only the first i items with capacity w. Row 0 is all zeros.","For each item i and each capacity w, there are two options: skip the item (copy the value from [i−1][w]) or, if the item fits, take it (its value plus [i−1][w − weight]).","Store the larger of the two options in [i][w]. Smaller subproblems are reused instead of recomputed.","The answer is the value in the bottom-right cell [n][W].","To find which items were taken, walk backwards from that cell: if [i][w] differs from [i−1][w], item i was taken, so subtract its weight and move up. It is exact and fast when W is moderate (W is the capacity)."]},
+back:{name:"Backtracking (Branch and Bound)",time:"O(2ⁿ) worst case",space:"O(n)",
+steps:["Sort items by value-to-weight ratio, then explore a decision tree: at each level choose to take or skip the next item.","Take branch: only allowed if the item fits. Skip branch: always allowed. Recursion goes deeper, and when it returns the last choice is undone (backtracking).","At each node compute an optimistic upper bound: the current value plus the best you could get by filling the remaining space with fractions of the remaining items.","If that bound cannot beat the best complete solution found so far, prune the whole branch.","When the tree is exhausted, the best solution is optimal. Pruning usually skips most of the tree, but the worst case is still exponential."]}
+};
+var ORDER=["brute","greedy","dp","back"], results=null, active="brute";
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+
+function parseInput(){
+  var errs=[], capS=document.getElementById("cap").value.trim(), W=Number(capS);
+  if(capS===""||!Number.isInteger(W)||W<1||W>10000) errs.push("Capacity must be a whole number between 1 and 10000.");
+  var lines=document.getElementById("items").value.split("\n"), items=[];
+  lines.forEach(function(l,i){
+    if(!l.trim())return;
+    var p=l.split(",").map(function(s){return s.trim()});
+    if(p.length!==3||!p[0]){errs.push("Line "+(i+1)+": use the format name, weight, value.");return}
+    var w=Number(p[1]),v=Number(p[2]);
+    if(p[1]===""||!Number.isInteger(w)||w<=0){errs.push("Line "+(i+1)+": weight must be a positive whole number.");return}
+    if(p[2]===""||!isFinite(v)||v<0){errs.push("Line "+(i+1)+": value must be a number that is 0 or more.");return}
+    items.push({name:p[0],w:w,v:v});
+  });
+  if(items.length===0) errs.push("Enter at least one item.");
+  if(items.length>25) errs.push("Please use at most 25 items.");
+  return {W:W,items:items,errs:errs};
+}
+
+function brute(items,W){
+  var n=items.length,best=0,bm=0,ops=0;
+  if(n>20) return {skipped:"Brute force would need "+Math.pow(2,n).toLocaleString()+" subsets. It is disabled above 20 items to keep your browser responsive."};
+  for(var m=0;m<(1<<n);m++){
+    var w=0,v=0;
+    for(var i=0;i<n;i++){ops++;if(m&(1<<i)){w+=items[i].w;v+=items[i].v}}
+    if(w<=W&&v>best){best=v;bm=m}
+  }
+  var ch=items.filter(function(_,i){return bm&(1<<i)});
+  return {chosen:ch,ops:ops,note:"Checked "+(1<<n).toLocaleString()+" subsets."};
+}
+function greedy(items,W){
+  var s=items.slice().sort(function(a,b){return b.v/b.w-a.v/a.w}),left=W,ch=[];
+  s.forEach(function(it){if(it.w<=left){ch.push(it);left-=it.w}});
+  return {chosen:ch,ops:s.length,note:"Order tried: "+s.map(function(i){return i.name}).join(", ")+"."};
+}
+function dp(items,W){
+  var n=items.length,T=[],ops=0,i,w;
+  for(i=0;i<=n;i++){T.push(new Array(W+1).fill(0))}
+  for(i=1;i<=n;i++)for(w=0;w<=W;w++){
+    ops++;var it=items[i-1];T[i][w]=T[i-1][w];
+    if(it.w<=w&&T[i-1][w-it.w]+it.v>T[i][w])T[i][w]=T[i-1][w-it.w]+it.v;
+  }
+  var ch=[];w=W;
+  for(i=n;i>0;i--)if(T[i][w]!==T[i-1][w]){ch.push(items[i-1]);w-=items[i-1].w}
+  return {chosen:ch.reverse(),ops:ops,note:"Filled a table of "+(n+1)+" × "+(W+1)+" cells."};
+}
+function back(items,W){
+  var s=items.slice().sort(function(a,b){return b.v/b.w-a.v/a.w}),n=s.length,best=-1,bestSet=[],cur=[],nodes=0,pruned=0;
+  function bound(i,w,v){
+    var left=W-w,b=v;
+    for(;i<n;i++){
+      if(s[i].w<=left){left-=s[i].w;b+=s[i].v}
+      else{b+=s[i].v*left/s[i].w;break}
+    }
+    return b;
+  }
+  function go(i,w,v){
+    nodes++;
+    if(v>best){best=v;bestSet=cur.slice()}
+    if(i===n)return;
+    if(bound(i,w,v)<=best){pruned++;return}
+    if(w+s[i].w<=W){cur.push(s[i]);go(i+1,w+s[i].w,v+s[i].v);cur.pop()}
+    go(i+1,w,v);
+  }
+  go(0,0,0);
+  return {chosen:bestSet,ops:nodes,note:"Visited "+nodes+" nodes and pruned "+pruned+" branches (full tree has up to "+(Math.pow(2,n+1)-1).toLocaleString()+")."};
+}
+
+function render(){
+  var tabs=document.getElementById("tabs");
+  tabs.innerHTML=ORDER.map(function(k){return '<button role="tab" data-k="'+k+'" aria-selected="'+(k===active)+'">'+INFO[k].name+'</button>'}).join("");
+  var I=INFO[active],r=results.r[active],h='<h2>'+I.name+'</h2>';
+  h+='<div class="cx"><span><b>Time:</b> '+I.time+'</span><span><b>Space:</b> '+I.space+'</span></div>';
+  h+='<b>How it works</b><ol>'+I.steps.map(function(s){return '<li>'+esc(s)+'</li>'}).join("")+'</ol>';
+  h+='<b>Result for your input</b>';
+  if(r.skipped){h+='<p class="mut">'+esc(r.skipped)+'</p>'}
+  else{
+    var tw=0,tv=0;r.chosen.forEach(function(i){tw+=i.w;tv+=i.v});
+    h+='<p>Take: <b>'+(r.chosen.length?r.chosen.map(function(i){return esc(i.name)}).join(", "):"nothing")+'</b><br>Total value: <b>'+tv+'</b> · Total weight: <b>'+tw+'</b> of '+results.W+'<br><span class="mut">'+esc(r.note)+' Basic operations counted: '+r.ops.toLocaleString()+'.</span></p>';
+  }
+  document.getElementById("panel").innerHTML=h;
+}
+function total(r,k){if(r.skipped)return null;return r.chosen.reduce(function(a,i){return a+i.v},0)}
+function compare(){
+  var vals=ORDER.map(function(k){return total(results.r[k],k)}),mx=Math.max.apply(null,vals.filter(function(v){return v!==null}));
+  var h='<tr><th>Algorithm</th><th>Value</th><th>Weight</th><th>Operations</th><th>Optimal?</th></tr>';
+  ORDER.forEach(function(k,j){
+    var r=results.r[k];
+    if(r.skipped){h+='<tr><td>'+INFO[k].name+'</td><td colspan="4" class="mut">skipped (too many items)</td></tr>';return}
+    var w=r.chosen.reduce(function(a,i){return a+i.w},0);
+    h+='<tr><td>'+INFO[k].name+'</td><td>'+vals[j]+'</td><td>'+w+'</td><td>'+r.ops.toLocaleString()+'</td><td class="'+(vals[j]===mx?'best">Yes':'">No, ')+(vals[j]===mx?'':'lower value')+'</td></tr>';
+  });
+  document.getElementById("cmpT").innerHTML=h;
+}
+document.getElementById("run").onclick=function(){
+  var p=parseInput(),e=document.getElementById("err");
+  if(p.errs.length){e.textContent="Please fix the following:\n• "+p.errs.join("\n• ");document.getElementById("out").hidden=true;document.getElementById("cmp").hidden=true;return}
+  e.textContent="";
+  results={W:p.W,r:{brute:brute(p.items,p.W),greedy:greedy(p.items,p.W),dp:dp(p.items,p.W),back:back(p.items,p.W)}};
+  document.getElementById("out").hidden=false;document.getElementById("cmp").hidden=false;
+  render();compare();
+};
+document.getElementById("tabs").addEventListener("click",function(ev){
+  var k=ev.target.getAttribute("data-k");if(k&&results){active=k;render()}
+});
+</script>
+</body>
+</html>
